@@ -160,8 +160,8 @@ def main():
             if type_map[key][0] is not unicode:
                 element.set('type', TYPES[type_map[key][0]])
             if type_map[key][0] is unicode:
-                element.set('{urn:schemas-microsoft-com:officedata}jetType', "memo")
-                element.set('{urn:schemas-microsoft-com:officedata}sqlSType', "ntext")
+                # element.set('{%s}jetType' % OD_NS, "memo")
+                # element.set('{%s}sqlSType' % OD_NS, "ntext")
                 # chain_end(element,
                 #     E('annotation'),
                 #     E('appinfo',
@@ -173,7 +173,7 @@ def main():
                 chain_end(element,
                     E('simpleType'),
                     E('restriction', base='xsd:string'),
-                    E('maxLenth', value='536870910')
+                    E('maxLength', value='536870910')
                 )
                     
 
