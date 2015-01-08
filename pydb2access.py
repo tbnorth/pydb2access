@@ -13,12 +13,20 @@ import getpass
 import sqlite3 as db249
 
 from collections import defaultdict, OrderedDict
+from xml.sax.saxutils import escape
 
 from lxml import etree
 from lxml.builder import ElementMaker
 
 XSI_NS = "http://www.w3.org/2001/XMLSchema-instance"
 XSD_NS = "http://www.w3.org/2001/XMLSchema"
+OD_NS = "urn:schemas-microsoft-com:officedata"
+
+NS_MAP = {
+    'xsi': XSI_NS,
+    'xsd': XSD_NS,
+    'od': OD_NS,
+}
 
 CONNECT_PARAMS = [
     ('dsn', "Data source name as string"),
@@ -42,7 +50,15 @@ def make_parser():
         formatter_class=argparse.ArgumentDefaultsHelpFormatter
     )
      
-    parser.add_argument("--tables", type=list, default=[],
+    parser.add_argument("--show-tables", action='store_true',
+        help="Just show tables"
+    )
+    
+    parser.add_argument("--show-fields", action='store_true',
+        help="Just show tables and fields"
+    )
+    
+    parser.add_argument("--tables", type=str, default=[], nargs='+',
         help="tables to include, omit for all"
     )
     
@@ -84,7 +100,7 @@ def main():
     if opt.password == 'prompt':
         opt.password = getpass.getpass("DB password: ")
 
-    E = ElementMaker(nsmap={'xsi': XSI_NS})
+    E = ElementMaker(nsmap=NS_MAP)
     
     connect_params = {cp: getattr(opt, cp) for 
                       (cp, desc) in CONNECT_PARAMS
@@ -116,8 +132,9 @@ def main():
                 break
             output.write("<%s>\n" % table_name)
             for field_n, field_name in enumerate(fields):
-                value = "<%s>%s</%s>\n" % (field_name, row[field_n], field_name)
-                output.write(value.replace('&', '&amp;').encode('utf-8'))
+                value = "<%s>%s</%s>\n" % (
+                    field_name, escape(unicode(row[field_n])), field_name)
+                output.write(value.encode('utf-8'))
                 key = (table_name, field_name)
                 check_types(row[field_n], type_map[key])
             output.write("</%s>\n" % table_name)
@@ -125,7 +142,7 @@ def main():
     output.write("</dataroot>\n")
     output.close()
 
-    E = ElementMaker(namespace=XSD_NS, nsmap={'xsd': XSD_NS})
+    E = ElementMaker(namespace=XSD_NS, nsmap=NS_MAP)
     
     xsd = E('schema')
     root = chain_end(xsd, E('element', name='dataroot'), E('complexType'), E('sequence'))
@@ -138,8 +155,28 @@ def main():
         
         for field_name in get_field_names(cur, table_name):
             key = (table_name, field_name)
-            table.append(E('element', name=field_name, minOccurs="0", 
-                           type=TYPES[type_map[key][0]]))
+            element = chain_end(table,
+                E('element', name=field_name, minOccurs="0"))
+            if type_map[key][0] is not unicode:
+                element.set('type', TYPES[type_map[key][0]])
+            if type_map[key][0] is unicode:
+                element.set('{urn:schemas-microsoft-com:officedata}jetType', "memo")
+                element.set('{urn:schemas-microsoft-com:officedata}sqlSType', "ntext")
+                # chain_end(element,
+                #     E('annotation'),
+                #     E('appinfo',
+                #       E('{%s}fieldProperty' % OD_NS, name="ColumnWidth", type="3", value="-1"),
+                #       E('{%s}fieldProperty' % OD_NS, name="TextFormat", type="2", value="0"),
+                #       E('{%s}fieldProperty' % OD_NS, name="ResultType", type="2", value="0"),
+                #     ) 
+                # )
+                chain_end(element,
+                    E('simpleType'),
+                    E('restriction', base='xsd:string'),
+                    E('maxLenth', value='536870910')
+                )
+                    
+
     
     open('data.xsd', 'w').write(etree.tostring(xsd, pretty_print=True))
 
