@@ -11,6 +11,7 @@ Terry Brown, Terry_N_Brown@yahoo.com, Wed Jan  7 12:35:33 2015
 import argparse
 import datetime
 import getpass
+import pprint
 
 import sqlite3 as db249
 
@@ -21,7 +22,6 @@ from lxml import etree
 from lxml.builder import ElementMaker
 
 import parsedatetime
-
 
 XSI_NS = "http://www.w3.org/2001/XMLSchema-instance"
 XSD_NS = "http://www.w3.org/2001/XMLSchema"
@@ -54,18 +54,18 @@ def datetime_field(s):
     time_s, level = CAL.parse(s)
     if level != 3:
         raise TypeError
-    return datetime.datetime(time_s)
+    return datetime.datetime(time_s[0], time_s[1], time_s[2],
+                             time_s[3], time_s[4], time_s[5])
 def time_field(s):
     time_s, level = CAL.parse(s)
     if level != 2:
         raise TypeError
-    return datetime.time(time_s)
+    return datetime.time(time_s[3], time_s[4], time_s[5])
 def date_field(s):
     time_s, level = CAL.parse(s)
     if level != 1:
         raise TypeError
-    return datetime.date(time_s)
-
+    return datetime.date(time_s[0], time_s[1], time_s[2])
 def text_field(s):
     s = unicode(s)
     if len(s) > 255:
@@ -75,14 +75,19 @@ def text_field(s):
 # types ordered from most to least demanding
 TYPES = OrderedDict([
     (datetime_field, "xsd:dateTime"),
+    (date_field, "xsd:dateTime"),  # '2014-06-06' parses as a time
     (time_field, "xsd:dateTime"),
-    (date_field, "xsd:dateTime"),
     (int, "xsd:integer"), 
     (float, "xsd:decimal"), 
     (text_field, "xsd:string"),
     (unicode, "NOT USED"),
 ])
 
+TIME_FMT = {
+    date_field: "Medium Date",
+    time_field: "Long Time",
+    datetime_field: "General Date",
+}
 def make_parser():
      
     parser = argparse.ArgumentParser(
@@ -93,6 +98,10 @@ def make_parser():
     parser.add_argument("--show-tables", action='store_true',
         help="Just show tables"
     )
+    
+    # parser.add_argument("--sort-fields", action='store_true',
+    #     help="Order fields alphabetically"
+    # )
     
     parser.add_argument("--tables", type=str, default=[], nargs='+',
         help="tables to include, omit for all"
@@ -119,9 +128,12 @@ def chain_end(*elements):
         elements.pop(0)
     return elements[0]
     
-def get_field_names(cur, table_name):
+def get_field_names(cur, table_name, sort=False):
     cur.execute("select * from %s limit 0" % table_name)
-    return [i[0] for i in cur.description]
+    field_names = [i[0] for i in cur.description]
+    # if sort:
+    #     field_names.sort()
+    return field_names
     
 def check_types(x, types):
     while types:
@@ -129,10 +141,12 @@ def check_types(x, types):
             types[0](unicode(x))  # int(float) fails to fail, int("10.2") doesn't
             break
         except (TypeError, ValueError):
+            print 'DROPPED', types[0], x
             types.pop(0)    
-    
 def main():
     opt = make_parser().parse_args()
+    opt.sort_fields = False
+
     if opt.password == 'prompt':
         opt.password = getpass.getpass("DB password: ")
 
@@ -165,23 +179,29 @@ def main():
     type_map = defaultdict(lambda: list(TYPES))
 
     for table_name in opt.tables:
-        fields = get_field_names(cur, table_name)
+        fields = get_field_names(cur, table_name, opt.sort_fields)
         cur.execute("select * from %s" % table_name)
         for row_n, row in enumerate(cur):
             if opt.limit and row_n == opt.limit:
                 break
             output.write("<%s>\n" % table_name)
             for field_n, field_name in enumerate(fields):
+                x = row[field_n]
+                if x is None:
+                    continue
                 value = "<%s>%s</%s>\n" % (
-                    field_name, escape(unicode(row[field_n])), field_name)
+                    field_name, escape(unicode(x)), field_name)
                 output.write(value.encode('utf-8'))
-                if row[field_n] is not None:
-                    key = (table_name, field_name)
-                    check_types(row[field_n], type_map[key])
+                key = (table_name, field_name)
+                if x is not None and len(type_map[key]) > 1:
+                    check_types(x, type_map[key])
             output.write("</%s>\n" % table_name)
     
     output.write("</dataroot>\n")
     output.close()
+    
+    # for k,v in type_map.iteritems():
+    #     print k, v
 
     E = ElementMaker(namespace=XSD_NS, nsmap=NS_MAP)
     
@@ -194,17 +214,25 @@ def main():
         table = chain_end(xsd, E('element', name=table_name), 
                                E('complexType'), E('sequence'))
         
-        for field_name in get_field_names(cur, table_name):
+        for field_name in get_field_names(cur, table_name, opt.sort_fields):
             key = (table_name, field_name)
             element = chain_end(table,
                 E('element', name=field_name, minOccurs="0"))
-            if type_map[key][0] is not unicode:
+            type_ = type_map[key][0]
+            if type_ is not unicode:
                 element.set('type', TYPES[type_map[key][0]])
             else:
                 chain_end(element,
                     E('simpleType'),
                     E('restriction', base='xsd:string'),
                     E('maxLength', value='536870910')
+                )
+            if type_ in TIME_FMT:
+                chain_end(element,
+                    E('annotation'),
+                    E('appinfo'),
+                    E('{%s}fieldProperty' % OD_NS, name='Format', type='10',
+                      value=TIME_FMT[type_])
                 )
                     
     open('%s.xsd' % opt.output, 'w').write(etree.tostring(xsd, pretty_print=True))
