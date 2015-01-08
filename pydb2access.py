@@ -107,9 +107,9 @@ def make_parser():
         help="Just show tables"
     )
     
-    # parser.add_argument("--sort-fields", action='store_true',
-    #     help="Order fields alphabetically"
-    # )
+    parser.add_argument("--sort-fields", action='store_true',
+        help="Order fields alphabetically"
+    )
     
     parser.add_argument("--tables", type=str, default=[], nargs='+',
         help="tables to include, omit for all"
@@ -139,8 +139,8 @@ def chain_end(*elements):
 def get_field_names(cur, table_name, sort=False):
     cur.execute("select * from %s limit 0" % table_name)
     field_names = [i[0] for i in cur.description]
-    # if sort:
-    #     field_names.sort()
+    if sort:
+        field_names.sort()
     return field_names
     
 def check_types(x, types):
@@ -153,7 +153,6 @@ def check_types(x, types):
             types.pop(0)    
 def main():
     opt = make_parser().parse_args()
-    opt.sort_fields = False
 
     if opt.password == 'prompt':
         opt.password = getpass.getpass("DB password: ")
@@ -187,7 +186,7 @@ def main():
     type_map = defaultdict(lambda: list(TYPES))
 
     for table_name in opt.tables:
-        fields = get_field_names(cur, table_name, opt.sort_fields)
+        fields = get_field_names(cur, table_name)
         cur.execute("select * from %s" % table_name)
         for row_n, row in enumerate(cur):
             if opt.limit and row_n == opt.limit:
