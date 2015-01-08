@@ -3,7 +3,7 @@ pydb2access.py - convert a PEP 249 DB to MS Access
 XML preserving data types with XSD
 
 Requires lxml - http://lxml.de/ (pip install lxml)
-and parsedatetime (pip install parsedatetime)
+and dateutil (pip install dateutil)
 
 Terry Brown, Terry_N_Brown@yahoo.com, Wed Jan  7 12:35:33 2015
 """
@@ -18,10 +18,10 @@ import sqlite3 as db249
 from collections import defaultdict, OrderedDict
 from xml.sax.saxutils import escape
 
+from dateutil.parser import parse
+
 from lxml import etree
 from lxml.builder import ElementMaker
-
-import parsedatetime
 
 XSI_NS = "http://www.w3.org/2001/XMLSchema-instance"
 XSD_NS = "http://www.w3.org/2001/XMLSchema"
@@ -41,31 +41,39 @@ CONNECT_PARAMS = [
     ('database', "Database name"),
 ]
 
-"""https://bear.im/code/parsedatetime/docs/index.html
-   0 = not parsed at all
-   1 = parsed as a C{date}
-   2 = parsed as a C{time}
-   3 = parsed as a C{datetime}
-"""
 
-CAL = parsedatetime.Calendar()
+
+
+NODATE0 = parse('9000-1-1 12:12')
+NODATE1 = parse('9001-2-2 13:13')
 
 def datetime_field(s):
-    time_s, level = CAL.parse(s)
-    if level != 3:
+    
+    dt0 = parse(s, default=NODATE0)
+    dt1 = parse(s, default=NODATE1)
+    
+    if dt0 != dt1:
         raise TypeError
-    return datetime.datetime(time_s[0], time_s[1], time_s[2],
-                             time_s[3], time_s[4], time_s[5])
-def time_field(s):
-    time_s, level = CAL.parse(s)
-    if level != 2:
-        raise TypeError
-    return datetime.time(time_s[3], time_s[4], time_s[5])
+        
+    return dt0
 def date_field(s):
-    time_s, level = CAL.parse(s)
-    if level != 1:
+
+    dt0 = parse(s, default=NODATE0)
+    dt1 = parse(s, default=NODATE1)
+    
+    if dt0.date() != dt1.date():
         raise TypeError
-    return datetime.date(time_s[0], time_s[1], time_s[2])
+
+    return dt0.date()
+def time_field(s):
+
+    dt0 = parse(s, default=NODATE0)
+    dt1 = parse(s, default=NODATE1)
+    
+    if dt0.time() != dt1.time():
+        raise TypeError
+
+    return dt0.time()
 def text_field(s):
     s = unicode(s)
     if len(s) > 255:
@@ -74,13 +82,13 @@ def text_field(s):
 
 # types ordered from most to least demanding
 TYPES = OrderedDict([
-    (datetime_field, "xsd:dateTime"),
-    (date_field, "xsd:dateTime"),  # '2014-06-06' parses as a time
-    (time_field, "xsd:dateTime"),
     (int, "xsd:integer"), 
     (float, "xsd:decimal"), 
-    (text_field, "xsd:string"),
-    (unicode, "NOT USED"),
+    (datetime_field, "xsd:dateTime"),
+    (date_field, "xsd:dateTime"),
+    (time_field, "xsd:dateTime"),
+    (text_field, "xsd:string"),  # 255 char or less
+    (unicode, "NOT USED"),  # memo field
 ])
 
 TIME_FMT = {
@@ -141,7 +149,7 @@ def check_types(x, types):
             types[0](unicode(x))  # int(float) fails to fail, int("10.2") doesn't
             break
         except (TypeError, ValueError):
-            print 'DROPPED', types[0], x
+            #D print 'DROPPED', types[0], x
             types.pop(0)    
 def main():
     opt = make_parser().parse_args()
