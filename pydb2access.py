@@ -11,9 +11,7 @@ Terry Brown, Terry_N_Brown@yahoo.com, Wed Jan  7 12:35:33 2015
 import argparse
 import datetime
 import getpass
-import pprint
-
-import sqlite3 as db249
+import os
 
 from collections import defaultdict, OrderedDict
 from xml.sax.saxutils import escape
@@ -41,12 +39,46 @@ CONNECT_PARAMS = [
     ('database', "Database name"),
 ]
 
-
-
-
+# see datetime_field()
 NODATE0 = parse('9000-1-1 12:12')
 NODATE1 = parse('9001-2-2 13:13')
 
+def con_cur(opt, db249):
+    
+    connect_params = {cp: getattr(opt, cp) for 
+                      (cp, desc) in CONNECT_PARAMS
+                      if getattr(opt, cp) is not None}
+
+    if opt.dsn:
+        con = db249.connect(
+            opt.dsn + 
+            (" password=%s" % opt.password) if opt.password else ''
+        )
+    else:
+        con = db249.connect(**connect_params)
+
+    cur = con.cursor()
+    
+    if opt.schema:
+        cur.execute('set search_path to %s' % opt.schema)
+    
+    return con, cur
+def get_tables(opt, db249):
+    
+    con, cur = con_cur(opt, db249)
+    
+    if opt.module == 'sqlite3':
+        cur.execute("select tbl_name from sqlite_master where type = 'table'")
+    elif opt.schema:
+        cur.execute("select table_name from information_schema.tables "
+                    "where table_schema=%s", [opt.schema])
+    elif opt.module == 'psycopg2':
+        cur.execute("select table_schema||'.'||table_name "
+                    "from information_schema.tables")
+    else:
+        cur.execute("select table_name from information_schema.tables")
+    
+    return [i[0] for i in cur.fetchall()]
 def datetime_field(s):
     
     dt0 = parse(s, default=NODATE0)
@@ -83,7 +115,7 @@ def text_field(s):
 # types ordered from most to least demanding
 TYPES = OrderedDict([
     (int, "xsd:integer"), 
-    (float, "xsd:decimal"), 
+    (float, "xsd:double"), 
     (datetime_field, "xsd:dateTime"),
     (date_field, "xsd:dateTime"),
     (time_field, "xsd:dateTime"),
@@ -91,6 +123,7 @@ TYPES = OrderedDict([
     (unicode, "NOT USED"),  # memo field
 ])
 
+# Access format names for date/time
 TIME_FMT = {
     date_field: "Medium Date",
     time_field: "Long Time",
@@ -107,6 +140,10 @@ def make_parser():
         help="Just show tables"
     )
     
+    parser.add_argument("--infer-types", action='store_true',
+        help="Infer types instead of using DB types (always True for SQLite)"
+    )
+    
     parser.add_argument("--sort-fields", action='store_true',
         help="Order fields alphabetically"
     )
@@ -115,12 +152,24 @@ def make_parser():
         help="tables to include, omit for all"
     )
     
+    parser.add_argument("--module", type=str, default='sqlite3',
+        help="name of DB API module, 'sqlite3' or 'psycopg2' for PostgreSQL"
+    )
+    
+    parser.add_argument("--prefix", type=str, default='',
+        help="prefix for all exported table names, e.g. 'myschema_'"
+    )
+    
+    parser.add_argument("--schema", type=str, default='',
+        help="PostgreSQL schema (i.e. namespace)"
+    )
+    
     parser.add_argument("--limit", type=int, default=-1,
         help="max. rows to output, per table, for testing"
     )
 
     parser.add_argument('output', type=str,
-             help="base name for output, '.xml' and '.xsd' files created"
+             help="base name for output folder for .xml and .xsd files"
          )
 
     for cp, desc in CONNECT_PARAMS:
@@ -143,6 +192,8 @@ def get_field_names(cur, table_name, sort=False):
         field_names.sort()
     return field_names
     
+def make_type_map(opt, db249):
+    pass
 def check_types(x, types):
     while types:
         try:
@@ -153,31 +204,45 @@ def check_types(x, types):
             types.pop(0)    
 def main():
     opt = make_parser().parse_args()
+    if opt.module == 'sqlite3':
+        opt.infer_types = True
+    
+    exec "import %s as db249" % opt.module
 
     if opt.password == 'prompt':
         opt.password = getpass.getpass("DB password: ")
 
-    E = ElementMaker(nsmap=NS_MAP)
-    
-    connect_params = {cp: getattr(opt, cp) for 
-                      (cp, desc) in CONNECT_PARAMS
-                      if getattr(opt, cp) is not None}
-    
-    con = db249.connect(**connect_params)
-    cur = con.cursor()
-    
     if not opt.tables:
-        cur.execute("select tbl_name from sqlite_master where type = 'table'")
-        opt.tables = [i[0] for i in cur.fetchall()]
-        
+        opt.tables = get_tables(opt, db249)
     if opt.show_tables:
         print(' '.join(opt.tables))
         exit(0)
+
+    if not os.path.isdir(opt.output):
+        os.mkdir(opt.output)
+        
+    output = open('%s/%s.xml' % (opt.output, opt.output), 'w')
     
+    type_map = dump_data(opt, db249, output)
+    
+    if opt.show_tables:
+        return
+
+    if not opt.infer_types:
+        type_map = make_type_map(opt, db249)
+    
+    output = open('%s/%s.xsd' % (opt.output, opt.output), 'w')
+
+    dump_schema(opt, type_map, output)
+def dump_data(opt, db249, output):
+
+    E = ElementMaker(nsmap=NS_MAP)
+    
+    con, cur = con_cur(opt, db249)
+        
     db = E('dataroot')
     db.set('{%s}noNamespaceSchemaLocation' % XSI_NS, "%s.xsd" % opt.output)
-    
-    output = open('%s.xml' % opt.output, 'w')
+
     template = etree.tostring(etree.ElementTree(db), 
                               encoding='UTF-8', xml_declaration=True)
     template = template.replace("/>", ">")
@@ -191,37 +256,54 @@ def main():
         for row_n, row in enumerate(cur):
             if opt.limit and row_n == opt.limit:
                 break
-            output.write("<%s>\n" % table_name)
+            output.write("<%s%s>\n" % (opt.prefix, table_name))
             for field_n, field_name in enumerate(fields):
+                
                 x = row[field_n]
+                
                 if x is None:
                     continue
+                    
+                if isinstance(x, str):
+                    x = x.decode('utf-8')
+                if not isinstance(x, unicode):
+                    x = unicode(x)
                 value = "<%s>%s</%s>\n" % (
-                    field_name, escape(unicode(x)), field_name)
+                    field_name, escape(x), field_name)
+                    
                 output.write(value.encode('utf-8'))
-                key = (table_name, field_name)
-                if x is not None and len(type_map[key]) > 1:
-                    check_types(x, type_map[key])
-            output.write("</%s>\n" % table_name)
+                
+                if opt.infer_types:
+                    key = (table_name, field_name)
+                    if x is not None and len(type_map[key]) > 1:
+                        check_types(x, type_map[key])
+                    
+            output.write("</%s%s>\n" % (opt.prefix, table_name))
     
     output.write("</dataroot>\n")
     output.close()
     
-    # for k,v in type_map.iteritems():
-    #     print k, v
-
+    return type_map
+    
+def dump_schema(opt, type_map, output):
+    
+    tables = set(k[0] for k in type_map)
+    
     E = ElementMaker(namespace=XSD_NS, nsmap=NS_MAP)
     
     xsd = E('schema')
     root = chain_end(xsd, E('element', name='dataroot'), E('complexType'), E('sequence'))
-    for table_name in opt.tables:
-        root.append(E('element', ref=table_name, minOccurs="0",
+    for table_name in sorted(tables):
+        root.append(E('element', ref=opt.prefix+table_name, minOccurs="0",
             maxOccurs="unbounded"))
-    for table_name in opt.tables:
-        table = chain_end(xsd, E('element', name=table_name), 
+    for table_name in sorted(tables):
+        table = chain_end(xsd, E('element', name=opt.prefix+table_name), 
                                E('complexType'), E('sequence'))
         
-        for field_name in get_field_names(cur, table_name, opt.sort_fields):
+        field_names = [k[1] for k in type_map if k[0] == table_name]
+        if opt.sort_fields:
+            field_names.sort()
+        for field_name in field_names:
             key = (table_name, field_name)
             element = chain_end(table,
                 E('element', name=field_name, minOccurs="0"))
@@ -242,8 +324,8 @@ def main():
                       value=TIME_FMT[type_])
                 )
                     
-    open('%s.xsd' % opt.output, 'w').write(etree.tostring(xsd, pretty_print=True))
-
+    output.write(etree.tostring(xsd, pretty_print=True))
+    output.close()
 if __name__ == '__main__':
     main()
 
