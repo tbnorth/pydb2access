@@ -3,11 +3,13 @@ pydb2access.py - convert a PEP 249 DB to MS Access
 XML preserving data types with XSD
 
 Requires lxml - http://lxml.de/ (pip install lxml)
+and parsedatetime (pip install parsedatetime)
 
 Terry Brown, Terry_N_Brown@yahoo.com, Wed Jan  7 12:35:33 2015
 """
 
 import argparse
+import datetime
 import getpass
 
 import sqlite3 as db249
@@ -17,6 +19,9 @@ from xml.sax.saxutils import escape
 
 from lxml import etree
 from lxml.builder import ElementMaker
+
+import parsedatetime
+
 
 XSI_NS = "http://www.w3.org/2001/XMLSchema-instance"
 XSD_NS = "http://www.w3.org/2001/XMLSchema"
@@ -36,11 +41,46 @@ CONNECT_PARAMS = [
     ('database', "Database name"),
 ]
 
+"""https://bear.im/code/parsedatetime/docs/index.html
+   0 = not parsed at all
+   1 = parsed as a C{date}
+   2 = parsed as a C{time}
+   3 = parsed as a C{datetime}
+"""
+
+CAL = parsedatetime.Calendar()
+
+def datetime_field(s):
+    time_s, level = CAL.parse(s)
+    if level != 3:
+        raise TypeError
+    return datetime.datetime(time_s)
+def time_field(s):
+    time_s, level = CAL.parse(s)
+    if level != 2:
+        raise TypeError
+    return datetime.time(time_s)
+def date_field(s):
+    time_s, level = CAL.parse(s)
+    if level != 1:
+        raise TypeError
+    return datetime.date(time_s)
+
+def text_field(s):
+    s = unicode(s)
+    if len(s) > 255:
+        raise TypeError
+    return s
+
 # types ordered from most to least demanding
 TYPES = OrderedDict([
+    (datetime_field, "xsd:dateTime"),
+    (time_field, "xsd:dateTime"),
+    (date_field, "xsd:dateTime"),
     (int, "xsd:integer"), 
     (float, "xsd:decimal"), 
-    (unicode, "xsd:string"),
+    (text_field, "xsd:string"),
+    (unicode, "NOT USED"),
 ])
 
 def make_parser():
@@ -52,10 +92,6 @@ def make_parser():
      
     parser.add_argument("--show-tables", action='store_true',
         help="Just show tables"
-    )
-    
-    parser.add_argument("--show-fields", action='store_true',
-        help="Just show tables and fields"
     )
     
     parser.add_argument("--tables", type=str, default=[], nargs='+',
@@ -112,6 +148,10 @@ def main():
     if not opt.tables:
         cur.execute("select tbl_name from sqlite_master where type = 'table'")
         opt.tables = [i[0] for i in cur.fetchall()]
+        
+    if opt.show_tables:
+        print(' '.join(opt.tables))
+        exit(0)
     
     db = E('dataroot')
     db.set('{%s}noNamespaceSchemaLocation' % XSI_NS, "%s.xsd" % opt.output)
@@ -135,8 +175,9 @@ def main():
                 value = "<%s>%s</%s>\n" % (
                     field_name, escape(unicode(row[field_n])), field_name)
                 output.write(value.encode('utf-8'))
-                key = (table_name, field_name)
-                check_types(row[field_n], type_map[key])
+                if row[field_n] is not None:
+                    key = (table_name, field_name)
+                    check_types(row[field_n], type_map[key])
             output.write("</%s>\n" % table_name)
     
     output.write("</dataroot>\n")
@@ -159,26 +200,14 @@ def main():
                 E('element', name=field_name, minOccurs="0"))
             if type_map[key][0] is not unicode:
                 element.set('type', TYPES[type_map[key][0]])
-            if type_map[key][0] is unicode:
-                # element.set('{%s}jetType' % OD_NS, "memo")
-                # element.set('{%s}sqlSType' % OD_NS, "ntext")
-                # chain_end(element,
-                #     E('annotation'),
-                #     E('appinfo',
-                #       E('{%s}fieldProperty' % OD_NS, name="ColumnWidth", type="3", value="-1"),
-                #       E('{%s}fieldProperty' % OD_NS, name="TextFormat", type="2", value="0"),
-                #       E('{%s}fieldProperty' % OD_NS, name="ResultType", type="2", value="0"),
-                #     ) 
-                # )
+            else:
                 chain_end(element,
                     E('simpleType'),
                     E('restriction', base='xsd:string'),
                     E('maxLength', value='536870910')
                 )
                     
-
-    
-    open('data.xsd', 'w').write(etree.tostring(xsd, pretty_print=True))
+    open('%s.xsd' % opt.output, 'w').write(etree.tostring(xsd, pretty_print=True))
 
 if __name__ == '__main__':
     main()
