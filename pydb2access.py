@@ -12,14 +12,23 @@ import argparse
 import datetime
 import getpass
 import os
+import sys
 
 from collections import defaultdict, OrderedDict
 from xml.sax.saxutils import escape
 
-from dateutil.parser import parse
+try:
+    from dateutil.parser import parse
+except ImportError:
+    sys.stderr.write("pydb2access requires dateutil")
+    exit(10)
 
-from lxml import etree
-from lxml.builder import ElementMaker
+try:
+    from lxml import etree
+    from lxml.builder import ElementMaker
+except ImportError:
+    sys.stderr.write("pydb2access requires lxml")
+    exit(10)
 
 XSI_NS = "http://www.w3.org/2001/XMLSchema-instance"
 XSD_NS = "http://www.w3.org/2001/XMLSchema"
@@ -80,34 +89,45 @@ def get_tables(opt, db249):
     
     return [i[0] for i in cur.fetchall()]
 def datetime_field(s):
-    
+    """Try and parse str s as a date and time, raise TypeError if not possible
+    """
     dt0 = parse(s, default=NODATE0)
     dt1 = parse(s, default=NODATE1)
     
     if dt0 != dt1:
+        # s is the same for both calls, but all parts (year, minute,
+        # etc.) of NODATE0 and NODATE1 differ, so any difference comes
+        # from the use of part of the default, implying s is not a
+        # complete date and time
         raise TypeError
         
     return dt0
 def date_field(s):
-
+    """Try and parse str s as a date, raise TypeError if not possible
+    """
     dt0 = parse(s, default=NODATE0)
     dt1 = parse(s, default=NODATE1)
     
     if dt0.date() != dt1.date():
+        # see datetime_field
         raise TypeError
 
     return dt0.date()
 def time_field(s):
-
+    """Try and parse str s as a time, raise TypeError if not possible
+    """
     dt0 = parse(s, default=NODATE0)
     dt1 = parse(s, default=NODATE1)
     
     if dt0.time() != dt1.time():
+        # see datetime_field
         raise TypeError
 
     return dt0.time()
 def text_field(s):
-    s = unicode(s)
+    """Try and parse str s as a string <= 255 char, raise TypeError otherwise
+    """
+    s = unicode(s)  # FIXME: 255 character unicode can be more than 255 bytes?
     if len(s) > 255:
         raise TypeError
     return s
@@ -130,26 +150,18 @@ TIME_FMT = {
     datetime_field: "General Date",
 }
 def make_parser():
-     
+
     parser = argparse.ArgumentParser(
         description="""Convert a PEP 249 DB to MS Access""",
-        formatter_class=argparse.ArgumentDefaultsHelpFormatter
+        # formatter_class=argparse.ArgumentDefaultsHelpFormatter
     )
      
-    parser.add_argument("--show-tables", action='store_true',
-        help="Just show tables"
+    parser.add_argument('output', type=str,
+        help="base name for output folder for .xml and .xsd files"
     )
-    
-    parser.add_argument("--infer-types", action='store_true',
-        help="Infer types instead of using DB types (always True for SQLite)"
-    )
-    
-    parser.add_argument("--sort-fields", action='store_true',
-        help="Order fields alphabetically"
-    )
-    
-    parser.add_argument("--tables", type=str, default=[], nargs='+',
-        help="tables to include, omit for all"
+
+    parser.add_argument("--tables", type=str, nargs='+',
+        help="list of tables to include, omit for all"
     )
     
     parser.add_argument("--module", type=str, default='sqlite3',
@@ -168,10 +180,23 @@ def make_parser():
         help="max. rows to output, per table, for testing"
     )
 
-    parser.add_argument('output', type=str,
-             help="base name for output folder for .xml and .xsd files"
-         )
-
+    parser.add_argument("--show-tables", action='store_true',
+        help="Just show list of table names and exit"
+    )
+    
+    parser.add_argument("--infer-types", action='store_true',
+        help="Infer types instead of using DB types (always True for SQLite)"
+    )
+    
+    parser.add_argument("--sort-fields", action='store_true',
+        help="Order fields alphabetically"
+    )
+    
+    parser.add_argument("--top-id", action='store_true',
+        help="Order fields alphabetically, but place fields with the same "
+             "name as the table first"
+    )
+    
     for cp, desc in CONNECT_PARAMS:
         parser.add_argument("--"+cp, help=desc)
 
@@ -301,8 +326,8 @@ def dump_schema(opt, type_map, output):
                                E('complexType'), E('sequence'))
         
         field_names = [k[1] for k in type_map if k[0] == table_name]
-        if opt.sort_fields:
-            field_names.sort()
+        if opt.sort_fields or opt.top_id:
+            field_names.sort(key=lambda x: ' ' if opt.top_id and x == table_name else x)
         for field_name in field_names:
             key = (table_name, field_name)
             element = chain_end(table,
