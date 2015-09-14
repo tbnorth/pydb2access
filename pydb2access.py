@@ -164,6 +164,10 @@ def make_parser():
         help="list of tables to include, omit for all"
     )
     
+    parser.add_argument("--exclude-tables", type=str, nargs='+',
+        help="list of tables to exclude"
+    )
+    
     parser.add_argument("--module", type=str, default='sqlite3',
         help="name of DB API module, 'sqlite3' or 'psycopg2' for PostgreSQL"
     )
@@ -176,7 +180,7 @@ def make_parser():
         help="PostgreSQL schema (i.e. namespace)"
     )
     
-    parser.add_argument("--limit", type=int, default=-1,
+    parser.add_argument("--limit", type=int, default=None,
         help="max. rows to output, per table, for testing"
     )
 
@@ -243,6 +247,7 @@ def main():
 
     if not opt.tables:
         opt.tables = get_tables(opt, db249)
+    opt.tables = [i for i in opt.tables if i not in opt.exclude_tables]
         
     if opt.show_tables:
         print(' '.join(sorted(opt.tables)))
@@ -287,13 +292,15 @@ def dump_data(opt, db249, output):
     output.write(template+'\n')
 
     type_map = defaultdict(lambda: list(TYPES))
-    
-    for table_name in opt.tables:
+
+    for table_n, table_name in enumerate(opt.tables):
         fields = get_field_names(cur, table_name)
-        cur.execute("select * from %s" % table_name)
+        q = "select * from %s" % table_name
+        if opt.limit is not None:
+            q += ' limit %d' % opt.limit
+        cur.execute(q)
+        print("Table %d/%d '%s', %d rows." % (table_n+1, len(opt.tables), table_name, cur.rowcount))
         for row_n, row in enumerate(cur):
-            if opt.limit and row_n == opt.limit:
-                break
             output.write("<%s%s>\n" % (opt.prefix, table_name))
             for field_n, field_name in enumerate(fields):
                 
@@ -315,9 +322,9 @@ def dump_data(opt, db249, output):
                     key = (table_name, field_name)
                     if x is not None and len(type_map[key]) > 1:
                         check_types(x, type_map[key])
-                    
+
             output.write("</%s%s>\n" % (opt.prefix, table_name))
-    
+
     output.write("</dataroot>\n")
     output.close()
     
