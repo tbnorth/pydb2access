@@ -300,10 +300,14 @@ def dump_data(opt, db249, output):
     output.write(template+'\n')
 
     type_map = defaultdict(lambda: list(TYPES))
+    
+    types_used = get_types(opt, db249)
 
     for table_n, table_name in enumerate(opt.tables):
         fields = get_field_names(cur, table_name)
-        q = "select * from %s" % table_name
+        fields = [i for i in fields 
+                  if str(types_used[(table_name, i)]) not in opt.exclude_types]
+        q = "select %s from %s" % (', '.join('"%s"' % i for i in fields), table_name)
         if opt.limit is not None:
             q += ' limit %d' % opt.limit
         cur.execute(q)
