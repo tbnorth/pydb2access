@@ -61,7 +61,7 @@ def con_cur(opt, db249):
     if opt.dsn:
         con = db249.connect(
             opt.dsn + 
-            (" password=%s" % opt.password) if opt.password else ''
+            ((" password=%s" % opt.password) if opt.password else '')
         )
     else:
         con = db249.connect(**connect_params)
@@ -183,6 +183,10 @@ def make_parser():
     parser.add_argument("--show-tables", action='store_true',
         help="Just show list of table names and exit"
     )
+
+    parser.add_argument("--show-types", action='store_true',
+        help="Just show list of types names and exit"
+    )
     
     parser.add_argument("--infer-types", action='store_true',
         help="Infer types instead of using DB types (always True for SQLite)"
@@ -239,8 +243,17 @@ def main():
 
     if not opt.tables:
         opt.tables = get_tables(opt, db249)
+        
     if opt.show_tables:
-        print(' '.join(opt.tables))
+        print(' '.join(sorted(opt.tables)))
+        exit(0)
+
+    if opt.show_types:
+        types = get_types(opt, db249)
+        for k in sorted(types):
+            print(k)
+            print("  "+str(types[k]))
+            print("")
         exit(0)
 
     if not os.path.isdir(opt.output):
@@ -274,7 +287,7 @@ def dump_data(opt, db249, output):
     output.write(template+'\n')
 
     type_map = defaultdict(lambda: list(TYPES))
-
+    
     for table_name in opt.tables:
         fields = get_field_names(cur, table_name)
         cur.execute("select * from %s" % table_name)
@@ -351,6 +364,24 @@ def dump_schema(opt, type_map, output):
                     
     output.write(etree.tostring(xsd, pretty_print=True))
     output.close()
+def get_types(opt, db249):
+    """get_types - list types seen in DB
+
+    :param argparse opt: options
+    :param module db249: DB API module
+    :return: dict of type usage
+    :rtype: dict
+    """
+
+    con, cur = con_cur(opt, db249)
+    types = defaultdict(lambda: list())
+    
+    for table in opt.tables:
+        cur.execute("select * from %s limit 0" % table)
+        for field in cur.description:
+            types[field.type_code].append("%s.%s" % (table, field.name))
+    
+    return types
 if __name__ == '__main__':
     main()
 
