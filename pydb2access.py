@@ -168,6 +168,10 @@ def make_parser():
         help="list of tables to exclude"
     )
     
+    parser.add_argument("--exclude-types", type=str, nargs='+',
+        help="list of types to exclude"
+    )
+    
     parser.add_argument("--module", type=str, default='sqlite3',
         help="name of DB API module, 'sqlite3' or 'psycopg2' for PostgreSQL"
     )
@@ -254,10 +258,14 @@ def main():
         exit(0)
 
     if opt.show_types:
-        types = get_types(opt, db249)
-        for k in sorted(types):
+        # usage = defaultdict(lambda: list())
+        # doesn't work because of above exec
+        usage = {}
+        for k, v in get_types(opt, db249).items():
+            usage.setdefault(v, list()).append("%s.%s" % k)
+        for k in sorted(usage):
             print(k)
-            print("  "+str(types[k]))
+            print("  "+str(usage[k]))
             print("")
         exit(0)
 
@@ -381,12 +389,12 @@ def get_types(opt, db249):
     """
 
     con, cur = con_cur(opt, db249)
-    types = defaultdict(lambda: list())
+    types = {}
     
     for table in opt.tables:
         cur.execute("select * from %s limit 0" % table)
         for field in cur.description:
-            types[field.type_code].append("%s.%s" % (table, field.name))
+            types[(table, field.name)] = field.type_code
     
     return types
 if __name__ == '__main__':
