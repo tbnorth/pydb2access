@@ -161,15 +161,15 @@ def make_parser():
     )
 
     parser.add_argument("--tables", type=str, nargs='+',
-        help="list of tables to include, omit for all"
+        help="list of tables to include, omit for all", default=[]
     )
     
     parser.add_argument("--exclude-tables", type=str, nargs='+',
-        help="list of tables to exclude"
+        help="list of tables to exclude", default=[]
     )
     
     parser.add_argument("--exclude-types", type=str, nargs='+',
-        help="list of types to exclude"
+        help="list of types to exclude", default=[]
     )
     
     parser.add_argument("--module", type=str, default='sqlite3',
@@ -337,6 +337,18 @@ def dump_data(opt, db249, output):
 
             output.write("</%s%s>\n" % (opt.prefix, table_name))
 
+    type_map["_FKS"] = get_fks(opt, db249)
+    if type_map["_FKS"]:
+        
+        for k, v in type_map["_FKS"].items():
+            if (k[1], k[2]) in type_map and (v[1], v[2]) in type_map:
+                output.write("<%s%s>\n" % (opt.prefix, '_LOOKUPS'))
+                output.write("<from_table>%s</from_table>\n" % k[1])
+                output.write("<from_field>%s</from_field>\n" % k[2])
+                output.write("<to_table>%s</to_table>\n" % v[1])
+                output.write("<to_field>%s</to_field>\n" % v[2])
+                output.write("</%s%s>\n" % (opt.prefix, '_LOOKUPS'))
+        
     output.write("</dataroot>\n")
     output.close()
     
@@ -345,6 +357,12 @@ def dump_data(opt, db249, output):
 def dump_schema(opt, type_map, output):
     
     tables = set(k[0] for k in type_map)
+    if type_map["_FKS"]:
+        tables.add("_LOOKUPS")
+        type_map[("_LOOKUPS", "from_table")] = [text_field]
+        type_map[("_LOOKUPS", "from_field")] = [text_field]
+        type_map[("_LOOKUPS", "to_table")] = [text_field]
+        type_map[("_LOOKUPS", "to_field")] = [text_field]
     
     E = ElementMaker(namespace=XSD_NS, nsmap=NS_MAP)
     
@@ -353,13 +371,16 @@ def dump_schema(opt, type_map, output):
     for table_name in sorted(tables):
         root.append(E('element', ref=opt.prefix+table_name, minOccurs="0",
             maxOccurs="unbounded"))
+
     for table_name in sorted(tables):
         table = chain_end(xsd, E('element', name=opt.prefix+table_name), 
                                E('complexType'), E('sequence'))
         
         field_names = [k[1] for k in type_map if k[0] == table_name]
-        if opt.sort_fields or opt.top_id:
-            field_names.sort(key=lambda x: ' ' if opt.top_id and x == table_name else x)
+        if opt.sort_fields:
+            field_names.sort()
+        if opt.top_id:
+            field_names = sort_fields(field_names, table_name)
         for field_name in field_names:
             key = (table_name, field_name)
             element = chain_end(table,
@@ -401,6 +422,63 @@ def get_types(opt, db249):
             types[(table, field.name)] = field.type_code
     
     return types
+def sort_fields(fields, table_name):
+    """sort_fields - sort fields to get PK first
+
+    :param [str] fields: field names
+    :param str table_name: table name
+    :return: sorted field
+    :rtype: [str]
+    """
+    
+    if table_name in fields:
+        return [table_name] + sorted([i for i in fields if i != table_name])
+    guess_table = table_name.split('_', 1)[-1]
+    return sorted(fields, key=lambda x: ' ' if x == guess_table else x)
+
+def get_fks(opt, db249):
+    """get_fks - return schema.table.field -> schema.table.field foreign key info
+
+    :param argparse namespace opt: options
+    :param module db249: pep 249 module
+    :return: {(table, field): (table, field),...}
+    :rtype: dict
+    """
+
+    if opt.module != 'psycopg2':
+        return {}
+    
+    con, cur = con_cur(opt, db249)
+
+    if opt.schema:
+        # this makes things much faster
+        filter = "where table_schema = '%s'" % opt.schema
+    else:
+        filter = ""
+    q = """
+        select constraint_column_usage.table_schema,
+               constraint_column_usage.table_name,  -- the constraining table
+               constraint_column_usage.column_name,
+               key_column_usage.table_schema,
+               key_column_usage.table_name,         -- the constrained table
+               key_column_usage.column_name
+          from (select * from information_schema.table_constraints
+                 where constraint_type='FOREIGN KEY') table_constraints
+               join 
+               (select * from information_schema.key_column_usage
+                 {filter}) key_column_usage using (constraint_name)
+               join 
+               (select * from information_schema.constraint_column_usage
+                 {filter}) constraint_column_usage using (constraint_name)
+        ;
+    """.format(filter=filter)
+    cur.execute(q)
+    ans = {}
+    for row in cur:
+        ans[(row[3], row[4], row[5])] = (row[0], row[1], row[2])
+    return ans
+
+    
 if __name__ == '__main__':
     main()
 
@@ -428,4 +506,21 @@ if __name__ == '__main__':
     </xsd:complexType>
   </xsd:element>
 </xsd:schema>
+
+-- this is quite slow if not pre-filtered for schema, 'FOREIGN KEY' filter doesn't help much
+select constraint_column_usage.table_schema,
+       constraint_column_usage.table_name,  -- the constraining table
+       constraint_column_usage.column_name,
+       key_column_usage.table_schema,
+       key_column_usage.table_name,         -- the constrained table
+       key_column_usage.column_name
+  from (select * from information_schema.table_constraints
+         where constraint_type='FOREIGN KEY') table_constraints
+       join 
+       (select * from information_schema.key_column_usage
+         where table_schema = 'glrimon') key_column_usage using (constraint_name)
+       join 
+       (select * from information_schema.constraint_column_usage
+         where table_schema = 'glrimon') constraint_column_usage using (constraint_name)
+;
 """
