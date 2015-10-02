@@ -12,6 +12,17 @@ yielded an answer saying that Access does not utilize such information.  So inst
 the relationships can be re-created in the Access file with the the ``_LOOKUPS``
 table and the Access in [relink.tables.vb](./relink.tables.vb).
 
+Importing large databases, dozens of tables, hundreds of thousands of records,
+seems to work best with a completely new Access DB to start with, and perhaps
+plenty of free RAM.  Random errors seem to occur otherwise.  When everything
+is working, importing occurs quite quickly, with progress feedback.
+
+Because a completely new database is recommended for importing, if you
+need to re-do the import because more data has been added, you should
+use two Access databases, one for the import, and another for storing
+queries etc. you develop for the data.  The latter should link to the
+former, which can be replaced as needed.
+
 ## --exclude-types
 
 Some types, e.g. geometry types (GIS polygons etc.) can't be exported, use
@@ -20,7 +31,7 @@ these types.  Run ``pydb2access.py`` with ``--show-types`` to get a list
 of type codes seen in the database, or in the subset of tables specified
 with ``--tables``.
 
-Command line::
+## Command line
 
     positional arguments:
       output                base name for output folder for .xml and .xsd files
