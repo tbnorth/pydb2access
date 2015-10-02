@@ -53,7 +53,14 @@ NODATE0 = parse('9000-1-1 12:12')
 NODATE1 = parse('9001-2-2 13:13')
 
 def con_cur(opt, db249):
-    
+    """
+    con_cur - Return connection to database
+
+    :param argparse Namespace opt: options
+    :param module db249: PEP 249 DB API 2 module
+    :return: connection, cursor tuple
+    :rtype: (con, cur)
+    """
     connect_params = {cp: getattr(opt, cp) for 
                       (cp, desc) in CONNECT_PARAMS
                       if getattr(opt, cp) is not None}
@@ -73,6 +80,14 @@ def con_cur(opt, db249):
     
     return con, cur
 def get_tables(opt, db249):
+    """
+    get_tables - Return list of tables
+
+    :param argparse Namespace opt: options
+    :param module db249: PEP 249 DB API 2 module
+    :return: list of tables
+    :rtype: [str,...]
+    """
     
     con, cur = con_cur(opt, db249)
     
@@ -140,7 +155,7 @@ TYPES = OrderedDict([
     (date_field, "xsd:dateTime"),
     (time_field, "xsd:dateTime"),
     (text_field, "xsd:string"),  # 255 char or less
-    (unicode, "NOT USED"),  # memo field
+    (unicode, "NOT NEEDED"),  # memo field
 ])
 
 # Access format names for date/time
@@ -150,6 +165,7 @@ TIME_FMT = {
     datetime_field: "General Date",
 }
 def make_parser():
+    """Return an argparse parser"""
 
     parser = argparse.ArgumentParser(
         description="""Convert a PEP 249 DB to MS Access""",
@@ -169,7 +185,7 @@ def make_parser():
     )
     
     parser.add_argument("--exclude-types", type=str, nargs='+',
-        help="list of types to exclude", default=[]
+        help="list of types to exclude, get numbers using --show-types", default=[]
     )
     
     parser.add_argument("--module", type=str, default='sqlite3',
@@ -196,9 +212,9 @@ def make_parser():
         help="Just show list of types names and exit"
     )
     
-    parser.add_argument("--infer-types", action='store_true',
-        help="Infer types instead of using DB types (always True for SQLite)"
-    )
+    # parser.add_argument("--infer-types", action='store_true',
+    #     help="Infer types instead of using DB types (always True for SQLite)"
+    # )
     
     parser.add_argument("--sort-fields", action='store_true',
         help="Order fields alphabetically"
@@ -223,6 +239,15 @@ def chain_end(*elements):
     return elements[0]
     
 def get_field_names(cur, table_name, sort=False):
+    """
+    get_field_names - Return list of field names in `table_name`
+
+    :param PEP 249 cursor cur: cursor to acces DB
+    :param str table_name: table name
+    :param bool sort: sort field names before returning
+    :return: list of field names
+    :rtype: [str,...]
+    """
     cur.execute("select * from %s limit 0" % table_name)
     field_names = [i[0] for i in cur.description]
     if sort:
@@ -232,6 +257,14 @@ def get_field_names(cur, table_name, sort=False):
 def make_type_map(opt, db249):
     pass
 def check_types(x, types):
+    """
+    check_types - trim list of types until first type can interpret x
+
+    :param variant x: value to test type list with
+    :param list types: types ordered from most specific to most general
+    :return: nothing, but changes `types`
+    """
+
     while types:
         try:
             types[0](unicode(x))  # int(float) fails to fail, int("10.2") doesn't
@@ -240,9 +273,12 @@ def check_types(x, types):
             #D print 'DROPPED', types[0], x
             types.pop(0)    
 def main():
+
     opt = make_parser().parse_args()
     if opt.module == 'sqlite3':
         opt.infer_types = True
+        
+    opt.infer_types = True  # nothing else implemented yet
     
     exec "import %s as db249" % opt.module
 
@@ -286,6 +322,13 @@ def main():
 
     dump_schema(opt, type_map, output)
 def dump_data(opt, db249, output):
+    """
+    dump_data - write data to .xml file
+
+    :param argparse Namespace opt: options
+    :param module db249: PEP 249 DB API 2 module to use
+    :param file output: open file
+    """
 
     E = ElementMaker(nsmap=NS_MAP)
     
@@ -355,7 +398,14 @@ def dump_data(opt, db249, output):
     return type_map
     
 def dump_schema(opt, type_map, output):
-    
+    """
+    dump_schema - Write XML-Schema to .xsd file
+
+    :param argparse Namespace opt: options
+    :param dict type_map: type mappings
+    :param file output: open file type object
+    """
+
     tables = set(k[0] for k in type_map)
     if type_map["_FKS"]:
         tables.add("_LOOKUPS")
