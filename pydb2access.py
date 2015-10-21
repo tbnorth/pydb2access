@@ -61,23 +61,23 @@ def con_cur(opt, db249):
     :return: connection, cursor tuple
     :rtype: (con, cur)
     """
-    connect_params = {cp: getattr(opt, cp) for 
+    connect_params = {cp: getattr(opt, cp) for
                       (cp, desc) in CONNECT_PARAMS
                       if getattr(opt, cp) is not None}
 
     if opt.dsn:
         con = db249.connect(
-            opt.dsn + 
+            opt.dsn +
             ((" password=%s" % opt.password) if opt.password else '')
         )
     else:
         con = db249.connect(**connect_params)
 
     cur = con.cursor()
-    
+
     if opt.schema:
         cur.execute('set search_path to %s' % opt.schema)
-    
+
     return con, cur
 def get_tables(opt, db249):
     """
@@ -88,9 +88,9 @@ def get_tables(opt, db249):
     :return: list of tables
     :rtype: [str,...]
     """
-    
+
     con, cur = con_cur(opt, db249)
-    
+
     if opt.module == 'sqlite3':
         cur.execute("select tbl_name from sqlite_master where type = 'table'")
     elif opt.schema:
@@ -101,28 +101,28 @@ def get_tables(opt, db249):
                     "from information_schema.tables")
     else:
         cur.execute("select table_name from information_schema.tables")
-    
+
     return [i[0] for i in cur.fetchall()]
 def datetime_field(s):
     """Try and parse str s as a date and time, raise TypeError if not possible
     """
     dt0 = parse(s, default=NODATE0)
     dt1 = parse(s, default=NODATE1)
-    
+
     if dt0 != dt1:
         # s is the same for both calls, but all parts (year, minute,
         # etc.) of NODATE0 and NODATE1 differ, so any difference comes
         # from the use of part of the default, implying s is not a
         # complete date and time
         raise TypeError
-        
+
     return dt0
 def date_field(s):
     """Try and parse str s as a date, raise TypeError if not possible
     """
     dt0 = parse(s, default=NODATE0)
     dt1 = parse(s, default=NODATE1)
-    
+
     if dt0.date() != dt1.date():
         # see datetime_field
         raise TypeError
@@ -133,7 +133,7 @@ def time_field(s):
     """
     dt0 = parse(s, default=NODATE0)
     dt1 = parse(s, default=NODATE1)
-    
+
     if dt0.time() != dt1.time():
         # see datetime_field
         raise TypeError
@@ -149,8 +149,8 @@ def text_field(s):
 
 # types ordered from most to least demanding
 TYPES = OrderedDict([
-    (int, "xsd:integer"), 
-    (float, "xsd:double"), 
+    (int, "xsd:integer"),
+    (float, "xsd:double"),
     (datetime_field, "xsd:dateTime"),
     (date_field, "xsd:dateTime"),
     (time_field, "xsd:dateTime"),
@@ -171,7 +171,7 @@ def make_parser():
         description="""Convert a PEP 249 DB to MS Access""",
         # formatter_class=argparse.ArgumentDefaultsHelpFormatter
     )
-     
+
     parser.add_argument('output', type=str,
         help="base name for output folder for .xml and .xsd files"
     )
@@ -179,27 +179,27 @@ def make_parser():
     parser.add_argument("--tables", type=str, nargs='+',
         help="list of tables to include, omit for all", default=[]
     )
-    
+
     parser.add_argument("--exclude-tables", type=str, nargs='+',
         help="list of tables to exclude", default=[]
     )
-    
+
     parser.add_argument("--exclude-types", type=str, nargs='+',
         help="list of types to exclude, get numbers using --show-types", default=[]
     )
-    
+
     parser.add_argument("--module", type=str, default='sqlite3',
         help="name of DB API module, 'sqlite3' or 'psycopg2' for PostgreSQL"
     )
-    
+
     parser.add_argument("--prefix", type=str, default='',
         help="prefix for all exported table names, e.g. 'myschema_'"
     )
-    
+
     parser.add_argument("--schema", type=str, default='',
         help="PostgreSQL schema (i.e. namespace)"
     )
-    
+
     parser.add_argument("--limit", type=int, default=None,
         help="max. rows to output, per table, for testing"
     )
@@ -211,25 +211,25 @@ def make_parser():
     parser.add_argument("--show-types", action='store_true',
         help="Just show list of types names and exit"
     )
-    
+
     # parser.add_argument("--infer-types", action='store_true',
     #     help="Infer types instead of using DB types (always True for SQLite)"
     # )
-    
+
     parser.add_argument("--sort-fields", action='store_true',
         help="Order fields alphabetically"
     )
-    
+
     parser.add_argument("--top-id", action='store_true',
         help="Order fields alphabetically, but place fields with the same "
              "name as the table first"
     )
-    
+
     for cp, desc in CONNECT_PARAMS:
         parser.add_argument("--"+cp, help=desc)
 
     return parser
- 
+
 def chain_end(*elements):
     "Make a chain of elements by .append()ing and return last (inner) element"
     elements = list(elements)
@@ -237,7 +237,7 @@ def chain_end(*elements):
         elements[0].append(elements[1])
         elements.pop(0)
     return elements[0]
-    
+
 def get_field_names(cur, table_name, sort=False):
     """
     get_field_names - Return list of field names in `table_name`
@@ -253,7 +253,7 @@ def get_field_names(cur, table_name, sort=False):
     if sort:
         field_names.sort()
     return field_names
-    
+
 def make_type_map(opt, db249):
     pass
 def check_types(x, types):
@@ -271,15 +271,15 @@ def check_types(x, types):
             break
         except (TypeError, ValueError):
             #D print 'DROPPED', types[0], x
-            types.pop(0)    
+            types.pop(0)
 def main():
 
     opt = make_parser().parse_args()
     if opt.module == 'sqlite3':
         opt.infer_types = True
-        
+
     opt.infer_types = True  # nothing else implemented yet
-    
+
     exec "import %s as db249" % opt.module
 
     if opt.password == 'prompt':
@@ -288,7 +288,7 @@ def main():
     if not opt.tables:
         opt.tables = get_tables(opt, db249)
     opt.tables = [i for i in opt.tables if i not in opt.exclude_tables]
-        
+
     if opt.show_tables:
         print(' '.join(sorted(opt.tables)))
         exit(0)
@@ -307,18 +307,23 @@ def main():
 
     if not os.path.isdir(opt.output):
         os.mkdir(opt.output)
-        
-    output = open('%s/%s.xml' % (opt.output, opt.output), 'w')
-    
+
+    path, output = os.path.split(opt.output)
+    path = os.path.join(path, output)
+    if not os.path.isdir(path):
+        os.makedirs(path)
+    path = os.path.join(path, output+'.xml')
+    output = open(path, 'w')
+
     type_map = dump_data(opt, db249, output)
-    
+
     if opt.show_tables:
         return
 
     if not opt.infer_types:
         type_map = make_type_map(opt, db249)
-    
-    output = open('%s/%s.xsd' % (opt.output, opt.output), 'w')
+
+    output = open(path[:-4] + '.xsd', 'w')
 
     dump_schema(opt, type_map, output)
 def dump_data(opt, db249, output):
@@ -331,24 +336,24 @@ def dump_data(opt, db249, output):
     """
 
     E = ElementMaker(nsmap=NS_MAP)
-    
+
     con, cur = con_cur(opt, db249)
-        
+
     db = E('dataroot')
     db.set('{%s}noNamespaceSchemaLocation' % XSI_NS, "%s.xsd" % opt.output)
 
-    template = etree.tostring(etree.ElementTree(db), 
+    template = etree.tostring(etree.ElementTree(db),
                               encoding='UTF-8', xml_declaration=True)
     template = template.replace("/>", ">")
     output.write(template+'\n')
 
     type_map = defaultdict(lambda: list(TYPES))
-    
+
     types_used = get_types(opt, db249)
 
     for table_n, table_name in enumerate(opt.tables):
         fields = get_field_names(cur, table_name)
-        fields = [i for i in fields 
+        fields = [i for i in fields
                   if str(types_used[(table_name, i)]) not in opt.exclude_types]
         q = "select %s from %s" % (', '.join('"%s"' % i for i in fields), table_name)
         if opt.limit is not None:
@@ -358,21 +363,21 @@ def dump_data(opt, db249, output):
         for row_n, row in enumerate(cur):
             output.write("<%s%s>\n" % (opt.prefix, table_name))
             for field_n, field_name in enumerate(fields):
-                
+
                 x = row[field_n]
-                
+
                 if x is None:
                     continue
-                    
+
                 if isinstance(x, str):
                     x = x.decode('utf-8')
                 if not isinstance(x, unicode):
                     x = unicode(x)
                 value = "<%s>%s</%s>\n" % (
                     field_name, escape(x), field_name)
-                    
+
                 output.write(value.encode('utf-8'))
-                
+
                 if opt.infer_types:
                     key = (table_name, field_name)
                     if x is not None and len(type_map[key]) > 1:
@@ -382,7 +387,7 @@ def dump_data(opt, db249, output):
 
     type_map["_FKS"] = get_fks(opt, db249)
     if type_map["_FKS"]:
-        
+
         for k, v in type_map["_FKS"].items():
             if (k[1], k[2]) in type_map and (v[1], v[2]) in type_map:
                 output.write("<%s%s>\n" % (opt.prefix, '_LOOKUPS'))
@@ -391,12 +396,12 @@ def dump_data(opt, db249, output):
                 output.write("<to_table>%s</to_table>\n" % v[1])
                 output.write("<to_field>%s</to_field>\n" % v[2])
                 output.write("</%s%s>\n" % (opt.prefix, '_LOOKUPS'))
-        
+
     output.write("</dataroot>\n")
     output.close()
-    
+
     return type_map
-    
+
 def dump_schema(opt, type_map, output):
     """
     dump_schema - Write XML-Schema to .xsd file
@@ -413,9 +418,9 @@ def dump_schema(opt, type_map, output):
         type_map[("_LOOKUPS", "from_field")] = [text_field]
         type_map[("_LOOKUPS", "to_table")] = [text_field]
         type_map[("_LOOKUPS", "to_field")] = [text_field]
-    
+
     E = ElementMaker(namespace=XSD_NS, nsmap=NS_MAP)
-    
+
     xsd = E('schema')
     root = chain_end(xsd, E('element', name='dataroot'), E('complexType'), E('sequence'))
     for table_name in sorted(tables):
@@ -423,9 +428,9 @@ def dump_schema(opt, type_map, output):
             maxOccurs="unbounded"))
 
     for table_name in sorted(tables):
-        table = chain_end(xsd, E('element', name=opt.prefix+table_name), 
+        table = chain_end(xsd, E('element', name=opt.prefix+table_name),
                                E('complexType'), E('sequence'))
-        
+
         field_names = [k[1] for k in type_map if k[0] == table_name]
         if opt.sort_fields:
             field_names.sort()
@@ -451,7 +456,7 @@ def dump_schema(opt, type_map, output):
                     E('{%s}fieldProperty' % OD_NS, name='Format', type='10',
                       value=TIME_FMT[type_])
                 )
-                    
+
     output.write(etree.tostring(xsd, pretty_print=True))
     output.close()
 def get_types(opt, db249):
@@ -465,12 +470,13 @@ def get_types(opt, db249):
 
     con, cur = con_cur(opt, db249)
     types = {}
-    
+
     for table in opt.tables:
         cur.execute("select * from %s limit 0" % table)
         for field in cur.description:
-            types[(table, field.name)] = field.type_code
-    
+            # SQLite 3.8.2 descriptions are plain tuples, not namedtuples
+            types[(table, field[0])] = field[1]
+
     return types
 def sort_fields(fields, table_name):
     """sort_fields - sort fields to get PK first
@@ -480,7 +486,7 @@ def sort_fields(fields, table_name):
     :return: sorted field
     :rtype: [str]
     """
-    
+
     if table_name in fields:
         return [table_name] + sorted([i for i in fields if i != table_name])
     guess_table = table_name.split('_', 1)[-1]
@@ -497,7 +503,7 @@ def get_fks(opt, db249):
 
     if opt.module != 'psycopg2':
         return {}
-    
+
     con, cur = con_cur(opt, db249)
 
     if opt.schema:
@@ -514,10 +520,10 @@ def get_fks(opt, db249):
                key_column_usage.column_name
           from (select * from information_schema.table_constraints
                  where constraint_type='FOREIGN KEY') table_constraints
-               join 
+               join
                (select * from information_schema.key_column_usage
                  {filter}) key_column_usage using (constraint_name)
-               join 
+               join
                (select * from information_schema.constraint_column_usage
                  {filter}) constraint_column_usage using (constraint_name)
         ;
@@ -528,7 +534,7 @@ def get_fks(opt, db249):
         ans[(row[3], row[4], row[5])] = (row[0], row[1], row[2])
     return ans
 
-    
+
 if __name__ == '__main__':
     main()
 
@@ -566,10 +572,10 @@ select constraint_column_usage.table_schema,
        key_column_usage.column_name
   from (select * from information_schema.table_constraints
          where constraint_type='FOREIGN KEY') table_constraints
-       join 
+       join
        (select * from information_schema.key_column_usage
          where table_schema = 'glrimon') key_column_usage using (constraint_name)
-       join 
+       join
        (select * from information_schema.constraint_column_usage
          where table_schema = 'glrimon') constraint_column_usage using (constraint_name)
 ;
