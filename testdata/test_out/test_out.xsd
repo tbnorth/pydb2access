@@ -1,0 +1,41 @@
+<xsd:schema xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:od="urn:schemas-microsoft-com:officedata">
+  <xsd:element name="dataroot">
+    <xsd:complexType>
+      <xsd:sequence>
+        <xsd:element maxOccurs="unbounded" ref="_" minOccurs="0"/>
+        <xsd:element maxOccurs="unbounded" ref="test_table_1" minOccurs="0"/>
+      </xsd:sequence>
+    </xsd:complexType>
+  </xsd:element>
+  <xsd:element name="_">
+    <xsd:complexType>
+      <xsd:sequence>
+        <xsd:element name="F" minOccurs="0" type="xsd:integer"/>
+      </xsd:sequence>
+    </xsd:complexType>
+  </xsd:element>
+  <xsd:element name="test_table_1">
+    <xsd:complexType>
+      <xsd:sequence>
+        <xsd:element name="aString" minOccurs="0" type="xsd:string"/>
+        <xsd:element name="aBool" minOccurs="0" type="xsd:integer"/>
+        <xsd:element name="aDateTime" minOccurs="0" type="xsd:dateTime">
+          <xsd:annotation>
+            <xsd:appinfo>
+              <od:fieldProperty type="10" name="Format" value="General Date"/>
+            </xsd:appinfo>
+          </xsd:annotation>
+        </xsd:element>
+        <xsd:element name="anInt" minOccurs="0" type="xsd:integer"/>
+        <xsd:element name="aFloat" minOccurs="0" type="xsd:double"/>
+        <xsd:element name="aDate" minOccurs="0" type="xsd:dateTime">
+          <xsd:annotation>
+            <xsd:appinfo>
+              <od:fieldProperty type="10" name="Format" value="Medium Date"/>
+            </xsd:appinfo>
+          </xsd:annotation>
+        </xsd:element>
+      </xsd:sequence>
+    </xsd:complexType>
+  </xsd:element>
+</xsd:schema>
