@@ -315,7 +315,7 @@ def main():
     path = os.path.join(path, output+'.xml')
     output = open(path, 'w')
 
-    type_map = dump_data(opt, db249, output)
+    type_map = dump_data(opt, db249, output, os.path.basename(path))
 
     if opt.show_tables:
         return
@@ -326,7 +326,7 @@ def main():
     output = open(path[:-4] + '.xsd', 'w')
 
     dump_schema(opt, type_map, output)
-def dump_data(opt, db249, output):
+def dump_data(opt, db249, output, output_path):
     """
     dump_data - write data to .xml file
 
@@ -340,7 +340,8 @@ def dump_data(opt, db249, output):
     con, cur = con_cur(opt, db249)
 
     db = E('dataroot')
-    db.set('{%s}noNamespaceSchemaLocation' % XSI_NS, "%s.xsd" % opt.output)
+    db.set('{%s}noNamespaceSchemaLocation' % XSI_NS,
+           output_path.replace('.xml', '.xsd'))
 
     template = etree.tostring(etree.ElementTree(db),
                               encoding='UTF-8', xml_declaration=True)
