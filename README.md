@@ -10,7 +10,7 @@ lists the relationships (foreign keys) in the database.  XML-Schema (.xsd) files
 are capable of representing this information, but a long web search only
 yielded an answer saying that Access does not utilize such information.  So instead,
 the relationships can be re-created in the Access file with the the ``_LOOKUPS``
-table and the Access in [relink.tables.vb](./relink.tables.vb).
+table and the Access code in [relink.tables.vb](./relink.tables.vb).
 
 Importing large databases, dozens of tables, hundreds of thousands of records,
 seems to work best with a completely new Access DB to start with, and perhaps
