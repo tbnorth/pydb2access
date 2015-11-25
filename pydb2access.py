@@ -343,6 +343,9 @@ def dump_data(opt, db249, output, output_path):
     db.set('{%s}noNamespaceSchemaLocation' % XSI_NS,
            output_path.replace('.xml', '.xsd'))
 
+    # Convert this complete XML to an open element so that large
+    # datasets may be written without trying to hold the whole
+    # thing in memory.  Hence the "manual" XML output in the following.
     template = etree.tostring(etree.ElementTree(db),
                               encoding='UTF-8', xml_declaration=True)
     template = template.replace("/>", ">")
