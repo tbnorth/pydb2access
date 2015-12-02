@@ -12,6 +12,9 @@ yielded an answer saying that Access does not utilize such information.  So inst
 the relationships can be re-created in the Access file with the the ``_LOOKUPS``
 table and the Access code in [relink.tables.vb](./relink.tables.vb).
 
+For step by step instructions for importing the data into Access,
+see [importing.md](importing.md).
+
 Importing large databases, dozens of tables, hundreds of thousands of records,
 seems to work best with a completely new Access DB to start with, and perhaps
 plenty of free RAM.  Random errors seem to occur otherwise.  When everything
