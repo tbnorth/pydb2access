@@ -36,6 +36,6 @@ and importing new data directly into it.
 
 <!-- generate .html version with
 
-     pandoc -H importing.css -o importing.html importing.md
+     pandoc -H sup/importing.css -o importing.html sup/importing.md
 -->
 
