@@ -1,6 +1,7 @@
 export_db () {
 
   # invoke pydb2access.py to export data, zip it, and scp it
+  # assumes that the pydb2access repo. folder exists in the same folder
 
   TS=$1
   SCHEMA=$2
@@ -17,6 +18,9 @@ export_db () {
     --top-id \
     --schema $SCHEMA \
     /tmp/$SCHEMA$TS
+
+  cp pydb2access/importing.html /tmp/$SCHEMA$TS
+  cp pydb2access/sup/LinkTemplate.accdb /tmp/$SCHEMA$TS
 
   OWD="$(pwd)"
   cd /tmp
