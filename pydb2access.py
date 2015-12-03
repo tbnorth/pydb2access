@@ -12,6 +12,7 @@ import argparse
 import datetime
 import getpass
 import os
+import re
 import sys
 
 from collections import defaultdict, OrderedDict
@@ -177,11 +178,11 @@ def make_parser():
     )
 
     parser.add_argument("--tables", type=str, nargs='+',
-        help="list of tables to include, omit for all", default=[]
+        help="list of tables to include, omit for all, case insensitive, regex.", default=[]
     )
 
     parser.add_argument("--exclude-tables", type=str, nargs='+',
-        help="list of tables to exclude", default=[]
+        help="list of tables to exclude, case insensitive, regex.", default=[]
     )
 
     parser.add_argument("--exclude-types", type=str, nargs='+',
@@ -285,9 +286,11 @@ def main():
     if opt.password == 'prompt':
         opt.password = getpass.getpass("DB password: ")
 
-    if not opt.tables:
-        opt.tables = get_tables(opt, db249)
-    opt.tables = [i for i in opt.tables if i not in opt.exclude_tables]
+    tables = get_tables(opt, db249)
+    if opt.tables:
+        tables = [i for i in tables if re_list_search(i, opt.tables)]
+    opt.tables = tables
+    opt.tables = [i for i in opt.tables if not re_list_search(i, opt.exclude_tables)]
 
     if opt.show_tables:
         print(' '.join(sorted(opt.tables)))
@@ -539,6 +542,15 @@ def get_fks(opt, db249):
     return ans
 
 
+def re_list_search(text, re_list):
+    """re_list_search - see if text matches any regular expressions in re_list
+
+    :param str text: text to test
+    :param [str] re_list: list of regular expressions
+    :rtype: bool
+    """
+
+    return any(re.search(i, text, re.IGNORECASE) for i in re_list)
 if __name__ == '__main__':
     main()
 
