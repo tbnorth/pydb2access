@@ -42,9 +42,10 @@ with ``--tables``.
     optional arguments:
       -h, --help            show this help message and exit
       --tables TABLES [TABLES ...]
-                            list of tables to include, omit for all
+                            list of tables to include, omit for all, case
+                            insensitive, regex.
       --exclude-tables EXCLUDE_TABLES [EXCLUDE_TABLES ...]
-                            list of tables to exclude
+                            list of tables to exclude, case insensitive, regex.
       --exclude-types EXCLUDE_TYPES [EXCLUDE_TYPES ...]
                             list of types to exclude, get numbers using --show-
                             types
