@@ -11,6 +11,7 @@
   code { font-family: monospace; font-size: 110%; }
   body { width: 800px; }
   li { margin-top: 1em; }
+  strong { font-weight: bold; font-style: italic; }
   </style>
 </head>
 <body>
@@ -21,18 +22,18 @@
 <li>Exported data should consist of two files, one with a <code>.xml</code> extension, and one with an <code>.xsd</code> extension. There may also be a file called <code>LinkTemplate.accdb</code>.</li>
 <li>If your exported data is a single <code>.zip</code> file, unzip it to access the <code>.xml</code> and <code>.xsd</code> files.</li>
 <li>Create a completely new, blank database, called <code>datadownload.accdb</code>.</li>
-<li>In <code>datadownload.accdb</code>, use the Import XML tool in the External data menu to import all the tables in the .xml/.xsd file.</li>
+<li>In <code>datadownload.accdb</code>, use the Import XML tool in the External data menu to import all the tables in the <strong><code>.xml</code></strong> file.</li>
 <li>Close <code>datadownload.accb</code></li>
 <li>Make a copy of <code>LinkTemplate.accdb</code> called <code>analysis.accdb</code>. Open it and enable disabled content, if any is reported.</li>
-<li>In <code>analysis.accdb</code>, link to all the tables in <code>datadownload.accdb</code> using the Access DB Import option in the External data menu - make sure to <em>link</em>, not copy / import.</li>
-<li>In <code>analysis.accdb</code>, open the <code>Link tables</code> form and click the <code>Link tables</code> button.</li>
+<li>In <code>analysis.accdb</code>, link to all the tables in <code>datadownload.accdb</code> using the <strong>Access</strong> DB Import option in the External data menu - make sure to <strong>link</strong>, not copy / import.</li>
+<li>In <code>analysis.accdb</code>, open the <code>Link tables</code> form and click the <code>Link tables</code> button. You should see a &quot;Tables linked&quot; message.</li>
 </ol>
 <p>Now all the relationships between tables should be visible in <code>analysis.accdb</code> in the Database Tools menu Relationships tool.</p>
-<p>Queries etc. should be written in <code>analysis.accdb</code>. If you need to update the imported data, delete <code>datadownload.accb</code> and repeat <em>only</em> steps 1-5. Queries etc. written in <code>analysis.accdb</code> will be unaffected.</p>
+<p>Queries etc. should be written in <code>analysis.accdb</code>. If you need to update the imported data, delete <code>datadownload.accb</code> and repeat <strong>only</strong> steps 1-5. Queries etc. written in <code>analysis.accdb</code> will be unaffected.</p>
 <p>This two database, start fresh for import approach is known to work with large databases (hundreds of thousands of records in dozens of tables) which may give trouble with a simpler recipe, such as using only one database and importing new data directly into it.</p>
 <!-- generate .html version with
 
-     pandoc -H importing.css -o importing.html importing.md
+     pandoc -H sup/importing.css -o importing.html sup/importing.md
 -->
 </body>
 </html>

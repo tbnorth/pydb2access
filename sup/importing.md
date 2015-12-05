@@ -12,21 +12,21 @@ There are a number of steps which need to be followed.
    the `.xml` and `.xsd` files.
 3. Create a completely new, blank database, called `datadownload.accdb`.
 4. In `datadownload.accdb`, use the Import XML tool in the External data
-   menu to import all the tables in the .xml/.xsd file.
+   menu to import all the tables in the **`.xml`** file.
 5. Close `datadownload.accb`
 6. Make a copy of `LinkTemplate.accdb` called `analysis.accdb`.  Open
    it and enable disabled content, if any is reported.
 7. In `analysis.accdb`, link to all the tables in `datadownload.accdb`
-   using the Access DB Import option in the External data menu - make sure
-   to *link*, not copy / import.
+   using the **Access** DB Import option in the External data menu - make sure
+   to **link**, not copy / import.
 8. In `analysis.accdb`, open the `Link tables` form and click the
-   `Link tables` button.
+   `Link tables` button.  You should see a "Tables linked" message.
 
 Now all the relationships between tables should be visible in `analysis.accdb`
 in the Database Tools menu Relationships tool.
 
 Queries etc. should be written in `analysis.accdb`.  If you need to update the
-imported data, delete `datadownload.accb` and repeat *only* steps 1-5.  Queries
+imported data, delete `datadownload.accb` and repeat **only** steps 1-5.  Queries
 etc. written in `analysis.accdb` will be unaffected.
 
 This two database, start fresh for import approach is known to work with

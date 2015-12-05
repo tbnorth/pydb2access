@@ -3,4 +3,5 @@
 code { font-family: monospace; font-size: 110%; }
 body { width: 800px; }
 li { margin-top: 1em; }
+strong { font-weight: bold; font-style: italic; }
 </style>

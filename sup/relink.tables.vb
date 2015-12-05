@@ -38,5 +38,7 @@ Sub relate_tables()
         rs.MoveNext
     Loop
 
+    MsgBox "Tables linked"
+
 End Sub
 
