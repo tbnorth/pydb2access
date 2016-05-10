@@ -46,6 +46,7 @@ CONNECT_PARAMS = [
     ('user', "User name as string"),
     ('password', "Password as string, 'prompt' for prompt"),
     ('host', "Hostname"),
+    ('port', "Port"),
     ('database', "Database name"),
 ]
 

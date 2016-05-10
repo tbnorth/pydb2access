@@ -51,7 +51,7 @@ class DBHandler(handler.ContentHandler):
             self.writer = csv.writer(open(self.table+'.csv', 'wb'))
             self.writer.writerow(self.ref_tables[self.path[1]])
 
-        self.writer.writerow([self.row.get(i) for i in self.ref_tables[self.path[1]]])
+        self.writer.writerow([self.row.get(i, '').encode('utf-8') for i in self.ref_tables[self.path[1]]])
         self.row = {}
 
         del self.path[-1]
