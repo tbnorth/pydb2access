@@ -218,12 +218,17 @@ def make_parser():
         help="Order fields alphabetically"
     )
 
+    parser.add_argument("--use-dml", type=str,
+        help="Use the supplied DML file, not internal data, to "
+             "define relationships"
+    )
+
     parser.add_argument("--top-id", action='store_true',
         help="Order fields alphabetically, but place fields with the same "
              "name as the table first"
     )
 
-    requiredNamed = parser.add_argument_group('required named arguments')
+   requiredNamed = parser.add_argument_group('required named arguments')
     requiredNamed.add_argument("--module", type=str, required=True,
         help="name of DB API module, 'sqlite3' or 'psycopg2' for PostgreSQL"
     )
