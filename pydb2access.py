@@ -190,10 +190,6 @@ def make_parser():
         help="list of types to exclude, get numbers using --show-types", default=[]
     )
 
-    parser.add_argument("--module", type=str, default='sqlite3',
-        help="name of DB API module, 'sqlite3' or 'psycopg2' for PostgreSQL"
-    )
-
     parser.add_argument("--prefix", type=str, default='',
         help="prefix for all exported table names, e.g. 'myschema_'"
     )
@@ -225,6 +221,11 @@ def make_parser():
     parser.add_argument("--top-id", action='store_true',
         help="Order fields alphabetically, but place fields with the same "
              "name as the table first"
+    )
+
+    requiredNamed = parser.add_argument_group('required named arguments')
+    requiredNamed.add_argument("--module", type=str, required=True,
+        help="name of DB API module, 'sqlite3' or 'psycopg2' for PostgreSQL"
     )
 
     for cp, desc in CONNECT_PARAMS:
